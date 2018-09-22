@@ -1,0 +1,19 @@
+#!/bin/bash
+
+fHostName=$HOSTNAME
+#fHostname="YourFriendlyHostname" # Uncomment and modify if you want to change the client name (defaults to hostname)
+
+# Replace with your Synergy version 1.x serial/license key (required for SSL probably)
+# Comment out if you don't need/have it
+serialKey="--serial-key XXXXXXXXXX"
+
+SynergyTestClient1="" # Keep empty to disable checking/starting 1st client option or set to 1st server's IP address & port
+#SynergyTestClient1="192.168.100.101:24800" # Example
+SynergyClient1Command="synergyc --daemon --restart --debug INFO --name ${fHostname} --enable-crypto ${SynergyClient1}:24800"
+
+SynergyTestClient2="" # Keep empty to disable checking/starting 2nd client option or set to 2nd server's IP address & port
+#SynergyTestClient2="192.168.100.202:24800" # Example
+SynergyClient2Command="synergyc --daemon --restart --debug INFO --name ${fHostname} --enable-crypto ${SynergyClient2}:24800"
+
+SynergyServerCommand="synergys --daemon --config ${HOME}/.config/Synergy/synergy-server.conf --log ${HOME}/.config/Synergy/server.log --restart --debug INFO --name ${fHostname} --enable-crypto --address :24800 ${serialKey}"
+# Enable more verbose output by changing '--debug': INFO => DEBUG1

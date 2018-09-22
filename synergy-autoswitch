@@ -1,0 +1,170 @@
+#!/bin/bash
+# Loops and autoswitches between client & server mode (depending on if the Synergy TCP port is responsive or not)
+# Also used for GDM3's greeter (login window, runs as 'gdm' user)
+
+username=$(whoami)
+
+# Initialize variables
+processesKilled=0
+
+# Get script's directory for includes
+myDIR="${BASH_SOURCE%/*}"
+if [[ ! -d "${myDIR}" ]]; then myDIR="${PWD}"; fi
+
+# Include functions
+if [[ -f ${myDIR}/functions.sh ]]; then
+	. "${myDIR}/functions.sh"
+else
+	echo "ERROR: Missing required 'synergy-autoswitch/functions.sh file!"
+	exit 1
+fi
+
+# Include settings
+if [[ -f ${myDIR}/settings.sh ]]; then
+	. "${myDIR}/settings.sh"
+else
+	echo "ERROR: Missing required 'synergy-autoswitch/settings.sh file!"
+	exit 1
+fi
+
+
+# Get GDM3 greeter's username
+greeterUsername=$(getGreeterUsername username)
+
+# Set defaults (can be overridden with arguments)
+allowLoop=1
+
+# If run as the GDM greeter user (started probably by the greeter as well), enable killing Synergy (if user logged in) and go to 'sleep cycle'
+if [[ $username == $greeterUsername ]]; then
+	sleepAllowed=1
+else
+	sleepAllowed=0
+fi
+
+# Go through all the arguments (case-insensitive)
+for argument in "${@:1}"; do
+    case "${argument}" in
+		[Kk][iI][lL][lL]) # kill
+			# Stop the Synergy client/server processes only
+			killallSynergy
+			exit 0
+		;;
+		[nN][oO][Ll][oO][oO][pP]) # noLoop
+			allowLoop=0
+		;;
+		[Kk][iI][lL][lL][Ll][oO][oO][pP]) # killLoop
+			# Stop running loop and stop Synergy client/server processes)
+			killOtherInstances
+			echo "Killing all Synergy(c/s) processes..."
+			killallSynergy
+			echo "Done."
+			exit 0
+		;;
+		[Ss][lL][eE][eE][pP])
+			sleepAllowed=1
+		;;
+		[nN][oO][Ss][lL][eE][eE][pP])
+			sleepAllowed=0
+		;;
+		[Dd][eE][bB][uU][gG])
+			# For debugging (save script launch time, user, PID and environment variables for the greeter etc.)
+			tmpEchoFile="/tmp/synergy-autoswitch.${username}.$$.log"
+			echo "`date` /// User: `whoami` // Home: ${HOME} // RUNNING_UNDER_GDM: ${RUNNING_UNDER_GDM}" > ${tmpEchoFile}
+			echo "### printenv ###" >> ${tmpEchoFile}
+			printenv >> ${tmpEchoFile}
+			echo "### printenv ###" >> ${tmpEchoFile}
+			printenv >> ${tmpEchoFile}.printenv
+			sort ${tmpEchoFile}.printenv > ${tmpEchoFile}.printenv.sort
+			mv ${tmpEchoFile}.printenv.sort ${tmpEchoFile}.printenv
+			chmod 644 ${tmpEchoFile}
+			chmod 644 ${tmpEchoFile}.printenv
+		;;
+		[Ss][cC][rR][eE][eE][nN])
+			if [[ $username == $greeterUsername ]]; then
+				# # Start 'screen' session as 'gdm'
+				screen -dmS gdm /bin/bash
+			fi
+		;;
+		"") # Do nothing if empty argument or no arguments
+			echo -n
+		;;
+		*)
+			echo
+			echo "${0}: Unknown argument: '${argument}'"
+			echo
+			echo 'Available arguments (case-insensitive):
+* kill => Stop Synergy client/server/GUI processes
+* killLoop => Stop running loop (and Synergy client/server/GUI processes)
+* noLoop => Run auto-switcher only once and exit
+
+# Debug
+* debug => Save script launch time, user, PID and environment variables to "/tmp/synergy-autoswitch.USERNAME.PID.log"
+* screen => Start "screen" session in background as the greeter user (for extra debugging)
+'
+			exit 1
+		;;
+    esac
+done
+
+checkIfRunningAtTheSameTime
+
+while true; do
+
+	if [[ $sleepAllowed -eq 1 ]]; then
+		# Sleep autoswitch (and kill all processes) if there any other X user's logged in
+		if XuserLoggedIn; then
+			if [[ processesKilled -eq 0 ]]; then
+				echo "WARNING: Another user is logged in to X server, skipping greeter's autoswitch and killing greeter's Synergy processes (trying again in 30secs)..."
+				killallSynergy
+				# Run this only once per 'sleep cycle'
+				processesKilled=1
+			fi
+			sleep 30
+			continue
+		fi
+
+		# Kill processes on next 'sleep cycle' (reset)
+		processesKilled=0
+	fi
+
+	# If 1st client option is not empty, try to connect with 'openssl' with 10 sec timeout
+	if [[ "${SynergyClient1}x" != "x" ]] && timeout --kill-after=12 10 openssl s_client -connect ${SynergyClient1} &>/dev/null </dev/null; then
+		if [[ $(pgrep -c -u ${username} -f "synergyc.* ${SynergyClient1}.*") == "0" ]]; then # Start Synergy client with the correct server address (if not running already)
+			echo "Switching to Synergy client 1st option (${SynergyClient1})"
+			killallSynergy
+			if [[ "${SynergyClient1Command}x" == "x" ]]; then
+				echo "ERROR: Missing (or empty) variable for 'SynergyClient1Command' in synergy-autoswitch/settings.sh"
+				exit 1
+			fi
+			${SynergyClient1Command}
+		fi
+	# Else if 2nd client option is not empty, try to connect with 'openssl' with 10 sec timeout
+	elif [[ "${SynergyClient2}x" != "x" ]] && timeout --kill-after=12 10 openssl s_client -connect ${SynergyClient2} &>/dev/null </dev/null; then
+		if [[ $(pgrep -c -u ${username} -f "synergyc.* ${SynergyClient2}.*") == "0" ]]; then # Start Synergy client with the correct server address (if not running already)
+			echo "Switching to Synergy client 2nd option (${SynergyClient2})"
+			killallSynergy
+			if [[ "${SynergyClient2Command}x" == "x" ]]; then
+				echo "ERROR: Missing (or empty) variable for 'SynergyClient2Command' in synergy-autoswitch/settings.sh"
+				exit 1
+			fi
+			${SynergyClient2Command}
+		fi
+	else
+		if [[ $(pgrep -c -u ${username} "synergys") == "0" ]]; then # Start 'synergys' if not running already
+			echo "Switching to Synergy server"
+			killallSynergy
+			${SynergyServerCommand}
+		fi
+	fi
+
+	# Run these only once, if requested with 'noLoop'
+	if [[ $allowLoop -eq 0 ]]; then
+		break
+	fi
+
+	sleep 10
+
+done
+
+
+exit 0

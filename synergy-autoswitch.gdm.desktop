@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Synergy
+Comment=Autoswitch Synergy in Server or Client mode (Loop)
+Exec=/path/to/script/synergy-autoswitch
+Terminal=false
+X-GNOME-Autostart-Phase=Initialization 
+# other choices: WindowManager|Panel|Desktop|Application
+X-GNOME-AutoRestart=true
