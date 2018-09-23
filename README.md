@@ -4,7 +4,7 @@ Synergy ([symless.com](https://symless.com/synergy)) for Linux version 1.X Autos
 
 I'm sharing my Bash script and autostart desktop files for starting Synergy version 1.x in client/server mode (using autoswitch and loop). Includes a short guide to enable Synergy version 1.X @ Ubuntu 18.04 login window (GDM3 greeter).
 
-I originally made this script for my IOMMU/VFIO Windows 10 Gaming virtual machine running under Linux host. The Win 10 VM switches also between client/server, but based on if a specific USB device (keyboard) is present or not. I sometimes also like to switch my laptop as a server to control my desktop computer.
+I originally made this script for my IOMMU/VFIO Windows 10 Gaming virtual machine running under Linux host. The Win 10 VM switches also between client/server, but [based on if a specific USB device (keyboard) is present or not.](https://github.com/firedo/synergy-windows-switch-usb) I sometimes also like to switch my laptop as a server to control my Linux host.
 
 Quick Install guide:
 
